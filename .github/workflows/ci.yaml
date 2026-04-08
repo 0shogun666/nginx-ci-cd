@@ -1,0 +1,35 @@
+name: CI/CD Pipeline
+
+# Spustí workflow při pushi do hlavní větve
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1️⃣ Checkout repozitáře
+      - uses: actions/checkout@v3
+
+      # 2️⃣ Přihlášení do Docker Hub
+      - name: Docker login
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      # 3️⃣ Build a push Docker image
+      - name: Build & push image
+        run: |
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/nginx:${{ github.sha }} .
+          docker push ${{ secrets.DOCKER_USERNAME }}/nginx:${{ github.sha }}
+
+      # 4️⃣ Deploy do Kubernetes
+      - name: Deploy to Kubernetes
+        run: |
+          # Nahradíme placeholder IMAGE_TAG commit SHA
+          sed -i "s|IMAGE_TAG|${{ github.sha }}|g" k8s/deployment.yaml
+          # Použijeme k8s YAML ze složky k8s
+          kubectl --kubeconfig ${{ secrets.KUBECONFIG }} apply -f k8s/
